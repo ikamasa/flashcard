@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="フラッシュカード" />
+  <meta name="theme-color" content="#1C1C1E" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <title>フラッシュカード</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    html, body { height: 100%; background: #1C1C1E; font-family: -apple-system, 'Hiragino Sans', sans-serif; }
+    #app {
+      max-width: 430px; margin: 0 auto; min-height: 100%;
+      background: #F2F2F7;
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+      display: flex; flex-direction: column;
+    }
+    .nb {
+      background: rgba(242,242,247,0.95);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      padding: 12px 16px 10px;
+      display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 0.5px solid rgba(0,0,0,0.15);
+      position: sticky; top: 0; z-index: 10;
+    }
+    .nb-title { font-size: 17px; font-weight: 700; color: #1C1C1E; }
+    .nb-sub { font-size: 12px; color: #8E8E93; margin-top: 1px; }
+    .nb-action { font-size: 15px; color: #007AFF; cursor: pointer; font-weight: 600; padding: 6px 10px; border-radius: 8px; border: none; background: none; }
+    .nb-action:active { background: rgba(0,122,255,0.12); }
+    .screen { display: none; flex: 1; flex-direction: column; }
+    .screen.active { display: flex; }
+
+    /* ── データ読み込み画面 ── */
+    .src-scroll { padding: 16px; overflow-y: auto; flex: 1; }
+    .tip-box { background: #FFF9E6; border-radius: 14px; padding: 13px 15px; margin-bottom: 14px; }
+    .tip-title { font-size: 13px; font-weight: 700; color: #7A5800; margin-bottom: 6px; }
+    .tip-text { font-size: 12px; color: #7A5800; line-height: 1.65; }
+    .tip-code { font-family: monospace; background: rgba(0,0,0,0.07); border-radius: 4px; padding: 1px 4px; font-size: 11px; }
+    .src-card { background: #fff; border-radius: 18px; overflow: hidden; margin-bottom: 12px; }
+    .src-header { padding: 14px 16px 10px; display: flex; align-items: center; gap: 10px; border-bottom: 0.5px solid #F2F2F7; }
+    .src-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+    .src-icon-sheet { background: #E8F5E9; }
+    .src-icon-json { background: #E3F2FD; }
+    .src-title { font-size: 15px; font-weight: 700; color: #1C1C1E; }
+    .src-desc { font-size: 12px; color: #8E8E93; margin-top: 2px; }
+    .src-body { padding: 12px 16px 14px; }
+    .src-label { font-size: 11px; font-weight: 600; color: #8E8E93; letter-spacing: 0.5px; margin-bottom: 5px; text-transform: uppercase; }
+    .src-input {
+      width: 100%; border: 0.5px solid #D1D1D6; border-radius: 10px;
+      padding: 10px 12px; font-size: 13px; color: #1C1C1E;
+      background: #F9F9F9; font-family: inherit; -webkit-appearance: none;
+    }
+    .src-input:focus { outline: none; border-color: #007AFF; background: #fff; }
+    .src-btn {
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      width: 100%; background: #007AFF; color: #fff; border: none;
+      border-radius: 12px; padding: 12px 0; font-size: 15px; font-weight: 700;
+      cursor: pointer; margin-top: 10px; -webkit-appearance: none;
+    }
+    .src-btn:active { filter: brightness(0.88); }
+    .src-status { margin-top: 8px; font-size: 13px; border-radius: 10px; padding: 9px 12px; text-align: center; display: none; }
+    .s-ok { background: #E5F5EA; color: #1B7A38; display: block !important; }
+    .s-err { background: #FFE5E5; color: #CC2929; display: block !important; }
+    .s-loading { background: #E5F0FF; color: #0055B3; display: block !important; }
+    .divider { display: flex; align-items: center; gap: 8px; padding: 4px 0 12px; }
+    .divider-line { flex: 1; height: 0.5px; background: #D1D1D6; }
+    .divider-text { font-size: 12px; color: #8E8E93; }
+    .local-btn {
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      width: 100%; background: #F2F2F7; color: #007AFF; border: none;
+      border-radius: 12px; padding: 12px 0; font-size: 15px; font-weight: 600;
+      cursor: pointer; -webkit-appearance: none;
+    }
+    .local-btn:active { filter: brightness(0.94); }
+
+    /* ── クイズ画面 ── */
+    .prog-wrap { padding: 10px 20px 6px; background: #F2F2F7; }
+    .prog-track { height: 4px; background: #D1D1D6; border-radius: 2px; overflow: hidden; }
+    .prog-fill { height: 100%; background: #007AFF; border-radius: 2px; transition: width 0.4s; }
+    .prog-lbl { display: flex; justify-content: space-between; font-size: 12px; color: #8E8E93; margin-top: 4px; }
+    .score-row { padding: 8px 20px; display: flex; gap: 10px; }
+    .sc { flex: 1; background: #fff; border-radius: 14px; padding: 8px 0; text-align: center; }
+    .sc-num { font-size: 22px; font-weight: 700; }
+    .sc-lbl { font-size: 11px; color: #8E8E93; }
+    .green { color: #34C759; } .red { color: #FF3B30; } .blue { color: #007AFF; }
+    .card-area { padding: 12px 20px 8px; flex: 1; display: flex; flex-direction: column; }
+    .flashcard {
+      width: 100%; min-height: 200px; background: #fff; border-radius: 22px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 28px 22px; cursor: pointer; user-select: none; position: relative;
+      transition: transform 0.08s;
+    }
+    .flashcard:active { transform: scale(0.975); }
+    .card-pos {
+      position: absolute; top: 13px; left: 14px;
+      background: #F2F2F7; border-radius: 10px; padding: 3px 9px;
+      font-size: 12px; font-weight: 600; color: #8E8E93;
+    }
+    .card-hint-lbl { position: absolute; bottom: 12px; right: 14px; font-size: 12px; color: #C7C7CC; }
+    .card-q { font-size: 30px; font-weight: 700; color: #1C1C1E; text-align: center; letter-spacing: -0.5px; word-break: break-word; line-height: 1.25; }
+    .ans-area { background: #fff; border-radius: 18px; margin-top: 10px; overflow: hidden; }
+    .ans-sec { padding: 14px 18px 12px; border-bottom: 0.5px solid #F2F2F7; }
+    .ans-sec:last-child { border-bottom: none; }
+    .ans-lbl { font-size: 11px; font-weight: 600; color: #8E8E93; letter-spacing: 0.5px; margin-bottom: 4px; text-transform: uppercase; }
+    .ans-text { font-size: 22px; font-weight: 700; color: #1C1C1E; word-break: break-word; }
+    .ans-note { font-size: 14px; color: #3C3C43; line-height: 1.55; word-break: break-word; }
+    .judge-area { padding: 10px 20px 14px; display: flex; gap: 12px; }
+    .jbtn {
+      flex: 1; border: none; border-radius: 16px; padding: 15px 0;
+      font-size: 16px; font-weight: 700; cursor: pointer;
+      display: flex; flex-direction: column; align-items: center; gap: 3px;
+      transition: transform 0.08s; -webkit-appearance: none;
+    }
+    .jbtn:active { transform: scale(0.96); }
+    .jbtn-sub { font-size: 11px; font-weight: 400; opacity: 0.65; }
+    .btn-ng { background: #FFE5E5; color: #FF3B30; }
+    .btn-ok { background: #E5F5EA; color: #34C759; }
+
+    /* ── 結果画面 ── */
+    .result-wrap { flex: 1; padding: 36px 20px 28px; display: flex; flex-direction: column; align-items: center; gap: 14px; justify-content: center; }
+    .res-emoji { font-size: 64px; }
+    .res-title { font-size: 26px; font-weight: 700; color: #1C1C1E; text-align: center; }
+    .res-sub { font-size: 15px; color: #8E8E93; text-align: center; }
+    .res-stats { display: flex; gap: 10px; width: 100%; }
+    .res-stat { flex: 1; background: #fff; border-radius: 16px; padding: 16px 0; text-align: center; }
+    .res-stat-num { font-size: 28px; font-weight: 700; }
+    .res-stat-lbl { font-size: 12px; color: #8E8E93; margin-top: 3px; }
+    .big-btn {
+      width: 100%; background: #007AFF; color: #fff; border: none;
+      border-radius: 16px; padding: 16px 0; font-size: 17px; font-weight: 700;
+      cursor: pointer; -webkit-appearance: none;
+    }
+    .big-btn:active { filter: brightness(0.88); }
+    .big-btn-sub {
+      width: 100%; background: #F2F2F7; color: #007AFF; border: none;
+      border-radius: 16px; padding: 14px 0; font-size: 15px; font-weight: 600;
+      cursor: pointer; -webkit-appearance: none;
+    }
+    .big-btn-sub:active { filter: brightness(0.94); }
+
+    .fade { animation: fadeIn 0.22s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    .pop { animation: pop 0.18s cubic-bezier(.4,0,.2,1); }
+    @keyframes pop { from { transform: scale(0.93); opacity: 0.5; } to { transform: scale(1); opacity: 1; } }
+  </style>
+</head>
+<body>
+<div id="app">
+  <div class="nb" id="navbar">
+    <div>
+      <div class="nb-title" id="nb-title">フラッシュカード</div>
+      <div class="nb-sub" id="nb-sub">Google Driveから問題を取得</div>
+    </div>
+    <div><button class="nb-action" id="nb-btn" style="display:none;"></button></div>
+  </div>
+
+  <!-- データ読み込み画面 -->
+  <div class="screen active" id="screen-src">
+    <div class="src-scroll">
+      <div class="tip-box">
+        <div class="tip-title">📋 準備方法</div>
+        <div class="tip-text">
+          <strong>スプレッドシート：</strong>列を <span class="tip-code">問題文 / ヒント / 答え / 補足</span> にして「ウェブに公開（CSV）」のURLを貼る<br><br>
+          <strong>JSON：</strong>DriveにJSONをアップロードし「リンクを知っている全員」で共有リンクを貼る
+        </div>
+      </div>
+
+      <div class="src-card">
+        <div class="src-header">
+          <div class="src-icon src-icon-sheet">📊</div>
+          <div>
+            <div class="src-title">Googleスプレッドシート</div>
+            <div class="src-desc">CSV形式で公開したURL</div>
+          </div>
+        </div>
+        <div class="src-body">
+          <div class="src-label">公開URL（CSV）</div>
+          <input class="src-input" id="sheet-url" type="url" placeholder="https://docs.google.com/spreadsheets/d/…/pub?output=csv" />
+          <button class="src-btn" onclick="loadSheet()">📥 読み込む</button>
+          <div class="src-status" id="sheet-status"></div>
+        </div>
+      </div>
+
+      <div class="divider">
+        <div class="divider-line"></div>
+        <div class="divider-text">または</div>
+        <div class="divider-line"></div>
+      </div>
+
+      <div class="src-card">
+        <div class="src-header">
+          <div class="src-icon src-icon-json">📄</div>
+          <div>
+            <div class="src-title">JSON ファイル</div>
+            <div class="src-desc">DriveのJSONファイル共有リンク</div>
+          </div>
+        </div>
+        <div class="src-body">
+          <div class="src-label">共有リンク</div>
+          <input class="src-input" id="json-url" type="url" placeholder="https://drive.google.com/file/d/…/view?usp=sharing" />
+          <button class="src-btn" onclick="loadJson()">📥 読み込む</button>
+          <div class="src-status" id="json-status"></div>
+        </div>
+      </div>
+
+      <div class="divider">
+        <div class="divider-line"></div>
+        <div class="divider-text">または</div>
+        <div class="divider-line"></div>
+      </div>
+
+      <button class="local-btn" onclick="useSample()">📝 サンプル問題で試す</button>
+      <div style="height: 24px;"></div>
+    </div>
+  </div>
+
+  <!-- クイズ画面 -->
+  <div class="screen" id="screen-quiz">
+    <div class="prog-wrap">
+      <div class="prog-track"><div class="prog-fill" id="prog-fill" style="width:0%"></div></div>
+      <div class="prog-lbl"><span id="prog-text">0 / 0</span><span id="prog-pct">0%</span></div>
+    </div>
+    <div class="score-row">
+      <div class="sc"><div class="sc-num green" id="c-ok">0</div><div class="sc-lbl">正解</div></div>
+      <div class="sc"><div class="sc-num red" id="c-ng">0</div><div class="sc-lbl">不正解</div></div>
+      <div class="sc"><div class="sc-num blue" id="c-rem">0</div><div class="sc-lbl">残り</div></div>
+    </div>
+    <div class="card-area">
+      <div class="flashcard" id="flashcard" onclick="revealAnswer()">
+        <div class="card-pos" id="q-pos"></div>
+        <div class="card-q" id="q-text"></div>
+        <div class="card-hint-lbl">👆 タップして確認</div>
+      </div>
+      <div class="ans-area" id="ans-area" style="display:none;">
+        <div class="ans-sec">
+          <div class="ans-lbl">答え</div>
+          <div class="ans-text" id="ans-main"></div>
+        </div>
+        <div class="ans-sec" id="ans-note-sec" style="display:none;">
+          <div class="ans-lbl">補足</div>
+          <div class="ans-note" id="ans-note"></div>
+        </div>
+      </div>
+    </div>
+    <div class="judge-area" id="judge-area" style="display:none;">
+      <button class="jbtn btn-ng" onclick="judge(false)">
+        <span style="font-size:22px;">✗</span><span>不正解</span><span class="jbtn-sub">もう一度</span>
+      </button>
+      <button class="jbtn btn-ok" onclick="judge(true)">
+        <span style="font-size:22px;">✓</span><span>正解</span><span class="jbtn-sub">次へ</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- 結果画面 -->
+  <div class="screen" id="screen-result">
+    <div class="result-wrap">
+      <div class="res-emoji" id="res-emoji">🎉</div>
+      <div class="res-title" id="res-title"></div>
+      <div class="res-sub" id="res-sub"></div>
+      <div class="res-stats">
+        <div class="res-stat"><div class="res-stat-num green" id="res-ok">0</div><div class="res-stat-lbl">正解</div></div>
+        <div class="res-stat"><div class="res-stat-num red" id="res-ng">0</div><div class="res-stat-lbl">不正解</div></div>
+        <div class="res-stat"><div class="res-stat-num blue" id="res-pct">0%</div><div class="res-stat-lbl">正解率</div></div>
+      </div>
+      <button class="big-btn" onclick="retryQuiz()">もう一度</button>
+      <button class="big-btn-sub" style="margin-top:10px;" onclick="goSrc()">データ読み込みに戻る</button>
+    </div>
+  </div>
+</div>
+
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js');
+}
+
+let cards = [], deck = [], idx = 0, cOk = 0, cNg = 0;
+
+const SAMPLE = [
+  { q: "日本の首都はどこ？", hint: "", a: "東京", note: "" },
+  { q: "水の化学式は？", hint: "H と O で構成", a: "H₂O", note: "水素2つと酸素1つ" },
+  { q: "世界で一番高い山は？", hint: "ヒマラヤ山脈", a: "エベレスト", note: "標高8,849m" },
+  { q: "光の速さは？", hint: "秒速 約 __ 万km", a: "約30万km/秒", note: "299,792,458 m/s" },
+  { q: "円周率の近似値は？", hint: "3.1…", a: "3.14159…", note: "πで表される無理数" },
+];
+
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + id).classList.add('active');
+}
+
+function setStatus(id, msg, cls) {
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  el.className = 'src-status ' + cls;
+}
+
+function driveDirectUrl(url) {
+  const m = url.match(/\/file\/d\/([^/]+)/);
+  if (m) return 'https://drive.google.com/uc?export=download&id=' + m[1];
+  return url;
+}
+
+async function loadSheet() {
+  const url = document.getElementById('sheet-url').value.trim();
+  if (!url) { setStatus('sheet-status', 'URLを入力してください', 's-err'); return; }
+  setStatus('sheet-status', '読み込み中...', 's-loading');
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('取得失敗');
+    const text = await res.text();
+    const rows = text.trim().split('\n').map(r => {
+      const cols = []; let cur = '', inQ = false;
+      for (const ch of r) {
+        if (ch === '"') { inQ = !inQ; }
+        else if (ch === ',' && !inQ) { cols.push(cur.trim()); cur = ''; }
+        else { cur += ch; }
+      }
+      cols.push(cur.trim()); return cols;
+    });
+    const header = rows[0].map(h => h.toLowerCase());
+    const qi = header.findIndex(h => h.includes('問題') || h === 'q');
+    const hi = header.findIndex(h => h.includes('ヒント') || h === 'hint');
+    const ai = header.findIndex(h => h.includes('答') || h === 'a');
+    const ni = header.findIndex(h => h.includes('補足') || h === 'note');
+    const data = rows.slice(1).map(r => ({
+      q: r[qi >= 0 ? qi : 0] || '',
+      hint: r[hi >= 0 ? hi : 1] || '',
+      a: r[ai >= 0 ? ai : 2] || '',
+      note: r[ni >= 0 ? ni : 3] || '',
+    })).filter(c => c.q && c.a);
+    if (data.length === 0) throw new Error('有効な問題が見つかりませんでした');
+    cards = data;
+    setStatus('sheet-status', `✅ ${cards.length}問 読み込み完了！`, 's-ok');
+    setTimeout(() => startQuiz(), 700);
+  } catch(e) {
+    setStatus('sheet-status', '❌ ' + e.message, 's-err');
+  }
+}
+
+async function loadJson() {
+  let url = document.getElementById('json-url').value.trim();
+  if (!url) { setStatus('json-status', 'URLを入力してください', 's-err'); return; }
+  url = driveDirectUrl(url);
+  setStatus('json-status', '読み込み中...', 's-loading');
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('取得失敗');
+    const text = await res.text();
+    const data = JSON.parse(text.replace(/```json|```/g, '').trim());
+    const arr = Array.isArray(data) ? data : data.cards || data.questions || [];
+    const mapped = arr.map(c => ({
+      q: c.q || c.question || c['問題文'] || '',
+      hint: c.hint || c['ヒント'] || '',
+      a: c.a || c.answer || c['答え'] || '',
+      note: c.note || c['補足'] || '',
+    })).filter(c => c.q && c.a);
+    if (mapped.length === 0) throw new Error('有効な問題が見つかりませんでした');
+    cards = mapped;
+    setStatus('json-status', `✅ ${cards.length}問 読み込み完了！`, 's-ok');
+    setTimeout(() => startQuiz(), 700);
+  } catch(e) {
+    setStatus('json-status', '❌ ' + e.message, 's-err');
+  }
+}
+
+function useSample() { cards = SAMPLE; startQuiz(); }
+
+function shuffle(a) {
+  const b = [...a];
+  for (let i = b.length-1; i > 0; i--) { const j = Math.floor(Math.random()*(i+1)); [b[i],b[j]]=[b[j],b[i]]; }
+  return b;
+}
+
+function startQuiz() {
+  deck = shuffle(cards); idx = 0; cOk = 0; cNg = 0;
+  document.getElementById('nb-title').textContent = '出題中';
+  document.getElementById('nb-sub').textContent = `全${deck.length}問`;
+  const btn = document.getElementById('nb-btn');
+  btn.textContent = '終了'; btn.style.display = 'block';
+  btn.onclick = goSrc;
+  show('quiz'); showCard();
+}
+
+function retryQuiz() { startQuiz(); }
+
+function goSrc() {
+  document.getElementById('nb-title').textContent = 'フラッシュカード';
+  document.getElementById('nb-sub').textContent = 'Google Driveから問題を取得';
+  document.getElementById('nb-btn').style.display = 'none';
+  show('src');
+}
+
+function showCard() {
+  const q = deck[idx];
+  document.getElementById('q-pos').textContent = q.hint || '';
+  document.getElementById('q-text').textContent = q.q;
+  document.getElementById('ans-area').style.display = 'none';
+  document.getElementById('judge-area').style.display = 'none';
+  document.getElementById('flashcard').style.cursor = 'pointer';
+  const fc = document.getElementById('flashcard');
+  fc.classList.remove('pop'); void fc.offsetWidth; fc.classList.add('pop');
+  updateScore();
+}
+
+function revealAnswer() {
+  if (document.getElementById('ans-area').style.display !== 'none') return;
+  const q = deck[idx];
+  document.getElementById('ans-main').textContent = q.a;
+  const ns = document.getElementById('ans-note-sec');
+  if (q.note) { document.getElementById('ans-note').textContent = q.note; ns.style.display = 'block'; }
+  else { ns.style.display = 'none'; }
+  document.getElementById('ans-area').style.display = 'block';
+  document.getElementById('ans-area').classList.add('fade');
+  document.getElementById('judge-area').style.display = 'flex';
+  document.getElementById('flashcard').style.cursor = 'default';
+}
+
+function judge(ok) {
+  if (ok) cOk++; else cNg++;
+  idx++;
+  if (idx >= deck.length) { showResult(); return; }
+  showCard();
+}
+
+function updateScore() {
+  document.getElementById('c-ok').textContent = cOk;
+  document.getElementById('c-ng').textContent = cNg;
+  document.getElementById('c-rem').textContent = deck.length - idx;
+  const pct = Math.round((idx / deck.length) * 100);
+  document.getElementById('prog-fill').style.width = pct + '%';
+  document.getElementById('prog-text').textContent = idx + ' / ' + deck.length;
+  document.getElementById('prog-pct').textContent = pct + '%';
+}
+
+function showResult() {
+  const pct = Math.round((cOk / deck.length) * 100);
+  document.getElementById('res-ok').textContent = cOk;
+  document.getElementById('res-ng').textContent = cNg;
+  document.getElementById('res-pct').textContent = pct + '%';
+  let emoji = '😢', title = 'もう少し！', sub = `正解率${pct}%。繰り返し練習しよう。`;
+  if (pct >= 80) { emoji = '🎉'; title = '素晴らしい！'; sub = `正解率${pct}%。よくできました！`; }
+  else if (pct >= 50) { emoji = '💪'; title = 'いい調子！'; sub = `正解率${pct}%。もう一息！`; }
+  document.getElementById('res-emoji').textContent = emoji;
+  document.getElementById('res-title').textContent = title;
+  document.getElementById('res-sub').textContent = sub;
+  document.getElementById('nb-title').textContent = '結果';
+  document.getElementById('nb-sub').textContent = '';
+  document.getElementById('nb-btn').style.display = 'none';
+  show('result');
+}
+</script>
+</body>
+</html>
